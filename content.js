@@ -1,4 +1,3 @@
-//test
 // Function to add a "Pull" button next to the "Copy" button
 function addPullButton(copyButton, codeText) {
   // Check if a "Pull" button already exists
@@ -6,6 +5,7 @@ function addPullButton(copyButton, codeText) {
     return; // Exit if a "Pull" button is already present
   }
 
+  // Create the "Pull" button
   const pullButton = document.createElement("div");
   pullButton.innerText = "Pull";
   pullButton.classList.add("pull-button"); // Add a class for identification
@@ -17,6 +17,7 @@ function addPullButton(copyButton, codeText) {
   pullButton.style.padding = "5px 10px";
   pullButton.style.cursor = "pointer";
 
+  // Add click event listener to the "Pull" button
   pullButton.addEventListener("click", () => {
     const filePath = prompt("Enter the file path in your repository (e.g., src/index.js):");
     if (filePath) {
@@ -42,12 +43,13 @@ function addPullButton(copyButton, codeText) {
   copyButton.parentNode.insertBefore(pullButton, copyButton.nextSibling);
 }
 
-// Function to detect the specific HTML structure and add the "Pull" button
+// Function to detect code blocks and add "Pull" buttons
 function detectCodeBlocks() {
   const codeBlocks = document.querySelectorAll(".md-code-block"); // Find all code block containers
   codeBlocks.forEach((codeBlock) => {
     const copyButton = codeBlock.querySelector(".ds-markdown-code-copy-button"); // Find the "Copy" button
-    const codeText = codeBlock.querySelector("pre")?.innerText; // Extract the code text
+    const codeElement = codeBlock.querySelector("pre"); // Find the <pre> element containing the code
+    const codeText = codeElement?.innerText; // Extract the code text
 
     if (copyButton && codeText) {
       addPullButton(copyButton, codeText);
