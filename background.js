@@ -1,8 +1,8 @@
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "pullCode") {
     const { code, filePath } = request;
-    const repo = "your-username/your-repo"; // Replace with your repository
-    const token = "your-github-token"; // Replace with your GitHub token
+    const repo = "think-based/DeepSync"; // Replace with your repository
+    const token = "e95fbd2f971f7eb5749d031ff91bdb30f60b78ed"; // Replace with your GitHub token
 
     const url = `https://api.github.com/repos/${repo}/contents/${filePath}`;
 
