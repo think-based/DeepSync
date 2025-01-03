@@ -11,8 +11,3 @@ A Chrome extension to pull code blocks from chat platforms (like ChatGPT and Dee
 
 ---
 
-## 🛠️ Setup
-1. Clone the repo:
-   ```bash
-   git clone https://github.com/your-username/deepsync.git
-   cd deepsync
