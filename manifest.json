@@ -1,7 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Chat Code Puller",
+  "name": "DeepSync",
   "version": "1.0",
+  "description": "Sync code blocks from chat platforms to GitHub.",
   "permissions": ["activeTab", "scripting", "storage"],
   "host_permissions": ["https://api.github.com/*"],
   "background": {
@@ -15,5 +16,13 @@
       ],
       "js": ["content.js"]
     }
-  ]
+  ],
+  "action": {
+    "default_popup": "popup.html", // افزودن پاپ‌آپ
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  }
 }
