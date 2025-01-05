@@ -1,3 +1,10 @@
+// Function to extract the file name from the code
+function extractFileName(code) {
+  const fileNameRegex = /\/\/FileName:\s*([^\n]+)/; // Regex to match //FileName:[نام فایل]
+  const match = code.match(fileNameRegex);
+  return match ? match[1].trim() : null; // Return the file name or null if not found
+}
+
 // Function to add a "Pull" button next to the "Copy" button
 function addPullButton(copyButton, codeText) {
   // Check if a "Pull" button already exists
@@ -19,7 +26,10 @@ function addPullButton(copyButton, codeText) {
 
   // Add click event listener to the "Pull" button
   pullButton.addEventListener("click", () => {
-    const filePath = prompt("Enter the file path in your repository (e.g., src/index.js):");
+    // Extract the file name from the code
+    const defaultFileName = extractFileName(codeText);
+    const filePath = prompt("Enter the file path in your repository (e.g., src/index.js):", defaultFileName || "");
+
     if (filePath) {
       // Send the code and file path to the background script
       chrome.runtime.sendMessage(
@@ -48,8 +58,7 @@ function detectCodeBlocks() {
   const codeBlocks = document.querySelectorAll(".md-code-block"); // Find all code block containers
   codeBlocks.forEach((codeBlock) => {
     const copyButton = codeBlock.querySelector(".ds-markdown-code-copy-button"); // Find the "Copy" button
-    const codeElement = codeBlock.querySelector("pre"); // Find the <pre> element containing the code
-    const codeText = codeElement?.innerText; // Extract the code text
+    const codeText = codeBlock.querySelector("pre")?.innerText; // Extract the code text
 
     if (copyButton && codeText) {
       addPullButton(copyButton, codeText);
