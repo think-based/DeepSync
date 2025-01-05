@@ -4,7 +4,10 @@
   "version": "1.0",
   "description": "Sync code blocks from chat platforms to GitHub.",
   "permissions": ["activeTab", "scripting", "storage"],
-  "host_permissions": ["https://api.github.com/*"],
+  "host_permissions": [
+    "https://api.github.com/*",
+    "https://github.com/*"
+  ],
   "background": {
     "service_worker": "background.js"
   },
@@ -18,7 +21,7 @@
     }
   ],
   "action": {
-    "default_popup": "popup.html", // افزودن پاپ‌آپ
+    "default_popup": "popup.html",
     "default_icon": {
       "16": "icon16.png",
       "48": "icon48.png",
