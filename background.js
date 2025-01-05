@@ -1,3 +1,11 @@
+
+// Function to encode Unicode strings to Base64
+function encodeUnicodeToBase64(str) {
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+    return String.fromCharCode('0x' + p1);
+  }));
+}
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "pullCode") {
     // دریافت تنظیمات از localStorage
@@ -44,4 +52,53 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-// Functions for updating and creating files (unchanged)
+// Function to update an existing file
+function updateFile(url, code, sha, token, sendResponse) {
+  console.log("Updating file...");
+  fetch(url, {
+    method: "PUT",
+    headers: {
+      Authorization: `token ${token}`,
+      Accept: "application/vnd.github.v3+json",
+    },
+    body: JSON.stringify({
+      message: "Update file via DeepSync Chrome Extension",
+      content: encodeUnicodeToBase64(code), // Encode code in Base64
+      sha: sha,
+    }),
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      console.log("GitHub API Response (Update):", data); // Log the response
+      sendResponse({ success: true, data });
+    })
+    .catch((error) => {
+      console.error("Error updating file:", error);
+      sendResponse({ success: false, error: error.message });
+    });
+}
+
+// Function to create a new file
+function createFile(url, code, token, sendResponse) {
+  console.log("Creating new file...");
+  fetch(url, {
+    method: "PUT",
+    headers: {
+      Authorization: `token ${token}`,
+      Accept: "application/vnd.github.v3+json",
+    },
+    body: JSON.stringify({
+      message: "Create new file via DeepSync Chrome Extension",
+      content: encodeUnicodeToBase64(code), // Encode code in Base64
+    }),
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      console.log("GitHub API Response (Create):", data); // Log the response
+      sendResponse({ success: true, data });
+    })
+    .catch((error) => {
+      console.error("Error creating file:", error);
+      sendResponse({ success: false, error: error.message });
+    });
+}
