@@ -1,31 +1,48 @@
-// بخش ثبت تنظیمات
-document.getElementById('settingsForm').addEventListener('submit', function (e) {
-  e.preventDefault(); // جلوگیری از ارسال فرم
+// تابع نمایش toast
+function showToast(message, isError = false) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = 'toast';
 
-  // دریافت مقادیر از فرم
+  if (isError) {
+    toast.classList.add('error');
+  }
+
+  toast.classList.add('show');
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+  }, 3000);
+}
+
+// Save settings
+document.getElementById('settingsForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+
   const repo = document.getElementById('repo').value;
   const token = document.getElementById('token').value;
 
-  // ذخیره تنظیمات در localStorage
   chrome.storage.local.set({ repo, token }, function () {
-    showNotification("DeepSync", "تنظیمات با موفقیت ذخیره شد!");
+    showToast("Settings saved successfully!");
   });
 });
 
-// بخش دریافت پروژه GitHub
+// Fetch GitHub project
 document.getElementById('githubForm').addEventListener('submit', async function (e) {
-  e.preventDefault(); // جلوگیری از ارسال فرم
+  e.preventDefault();
+
+  const fetchButton = document.getElementById('fetchButton');
+  fetchButton.disabled = true;
+  fetchButton.innerText = "Fetching...";
 
   const repoUrl = document.getElementById('repoUrl').value;
-  const repoPath = repoUrl.replace("https://github.com/", ""); // تبدیل آدرس به مسیر ریپازیتوری
+  const repoPath = repoUrl.replace("https://github.com/", "");
 
-  // ذخیره repoUrl در localStorage
   chrome.storage.local.set({ repoUrl }, function () {
-    console.log("آدرس ریپازیتوری ذخیره شد:", repoUrl);
+    console.log("Repository URL saved:", repoUrl);
   });
 
   try {
-    // دریافت فایل تنظیمات (config.json)
     const configResponse = await fetch(`https://api.github.com/repos/${repoPath}/contents/config.json`, {
       headers: {
         Accept: "application/vnd.github.v3+json",
@@ -33,13 +50,12 @@ document.getElementById('githubForm').addEventListener('submit', async function 
     });
 
     if (!configResponse.ok) {
-      throw new Error("فایل تنظیمات (config.json) یافت نشد!");
+      throw new Error("config.json file not found!");
     }
 
     const configData = await configResponse.json();
-    const configContent = JSON.parse(atob(configData.content)); // دیکد کردن محتوای Base64
+    const configContent = JSON.parse(atob(configData.content));
 
-    // دریافت لیست فایل‌ها از ریپازیتوری
     const repoResponse = await fetch(`https://api.github.com/repos/${repoPath}/contents`, {
       headers: {
         Accept: "application/vnd.github.v3+json",
@@ -53,7 +69,6 @@ document.getElementById('githubForm').addEventListener('submit', async function 
     const repoData = await repoResponse.json();
     let combinedText = "";
 
-    // فیلتر کردن فایل‌ها بر اساس تنظیمات
     const filesToDownload = repoData.filter(item => {
       const path = item.path;
       const isIncluded = configContent.include.some(pattern => matchPattern(path, pattern));
@@ -61,7 +76,6 @@ document.getElementById('githubForm').addEventListener('submit', async function 
       return isIncluded && !isExcluded;
     });
 
-    // دریافت محتوای هر فایل
     for (const item of filesToDownload) {
       if (item.type === "file") {
         const fileResponse = await fetch(item.download_url);
@@ -70,21 +84,23 @@ document.getElementById('githubForm').addEventListener('submit', async function 
       }
     }
 
-    // انتقال متن به کلیپ‌بورد
     navigator.clipboard.writeText(combinedText).then(() => {
-      showNotification("DeepSync", "متن با موفقیت به کلیپ‌بورد منتقل شد!");
+      showToast("Text copied to clipboard successfully!");
     }).catch((error) => {
-      console.error("خطا در انتقال به کلیپ‌بورد:", error);
-      showNotification("DeepSync Error", "خطا در انتقال به کلیپ‌بورد!");
+      console.error("Clipboard error:", error);
+      showToast("Failed to copy text to clipboard!", true);
     });
 
   } catch (error) {
     console.error("Error fetching GitHub project:", error);
-    showNotification("DeepSync Error", `خطا: ${error.message}`);
+    showToast(`Error: ${error.message}`, true);
+  } finally {
+    fetchButton.disabled = false;
+    fetchButton.innerText = "Fetch Project";
   }
 });
 
-// بازیابی تنظیمات از localStorage
+// Load saved settings
 chrome.storage.local.get(['repo', 'token', 'repoUrl'], function (data) {
   if (data.repo) {
     document.getElementById('repo').value = data.repo;
@@ -97,7 +113,7 @@ chrome.storage.local.get(['repo', 'token', 'repoUrl'], function (data) {
   }
 });
 
-// تابع برای تطبیق الگوهای wildcard
+// Wildcard pattern matching
 function matchPattern(path, pattern) {
   const regex = new RegExp(pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*'));
   return regex.test(path);
