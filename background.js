@@ -7,16 +7,6 @@ function encodeUnicodeToBase64(str) {
 
 // Listen for messages from content.js or popup.js
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "showNotification") {
-    // نمایش نوتیفیکیشن
-    chrome.notifications.create({
-      type: "basic",
-      iconUrl: "icon48.png", // آیکون نوتیفیکیشن
-      title: request.title, // عنوان نوتیفیکیشن
-      message: request.message, // پیام نوتیفیکیشن
-    });
-  }
-
   if (request.action === "updateGitFile" || request.action === "pushCode") {
     // دریافت تنظیمات از localStorage
     chrome.storage.local.get(['repo', 'token'], function (data) {
@@ -77,7 +67,12 @@ function updateFile(url, code, sha, token, sendResponse) {
       sha: sha,
     }),
   })
-    .then((response) => response.json())
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`GitHub API error: ${response.status} - ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then((data) => {
       console.log("GitHub API Response (Update):", data); // Log the response
       sendResponse({ success: true, isNewFile: false, filePath: data.content.path });
@@ -102,7 +97,12 @@ function createFile(url, code, token, sendResponse) {
       content: encodeUnicodeToBase64(code), // Encode code in Base64
     }),
   })
-    .then((response) => response.json())
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`GitHub API error: ${response.status} - ${response.statusText}`);
+      }
+      return response.json();
+    })
     .then((data) => {
       console.log("GitHub API Response (Create):", data); // Log the response
       sendResponse({ success: true, isNewFile: true, filePath: data.content.path });
