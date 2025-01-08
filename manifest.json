@@ -3,7 +3,7 @@
   "name": "DeepSync",
   "version": "1.0",
   "description": "Sync code blocks from chat platforms to GitHub.",
-  "permissions": ["activeTab", "scripting", "storage"],
+  "permissions": ["activeTab", "scripting", "storage", "clipboardWrite"],
   "host_permissions": [
     "https://api.github.com/*",
     "https://github.com/*"
