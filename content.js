@@ -79,7 +79,7 @@ function addUpdateGitButton(copyButton, codeText, codeBlock) {
 
       let filePath = extractFileName(codeBlock);
       if (!filePath) {
-        filePath = prompt("Please enter the file path in the repository (e.g., src/index.js):", "index.js");
+        filePath = prompt("Please enter the file path in the repository (e.g., src/index.js):", "");
       }
 
       if (filePath) {
