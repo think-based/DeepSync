@@ -12,22 +12,17 @@ document.getElementById('settingsForm').addEventListener('submit', function (e) 
   });
 });
 
-// بازیابی تنظیمات از localStorage
-chrome.storage.local.get(['repo', 'token'], function (data) {
-  if (data.repo) {
-    document.getElementById('repo').value = data.repo;
-  }
-  if (data.token) {
-    document.getElementById('token').value = data.token;
-  }
-});
-
 // بخش دریافت پروژه GitHub
 document.getElementById('githubForm').addEventListener('submit', async function (e) {
   e.preventDefault(); // جلوگیری از ارسال فرم
 
   const repoUrl = document.getElementById('repoUrl').value;
   const repoPath = repoUrl.replace("https://github.com/", ""); // تبدیل آدرس به مسیر ریپازیتوری
+
+  // ذخیره repoUrl در localStorage
+  chrome.storage.local.set({ repoUrl }, function () {
+    console.log("آدرس ریپازیتوری ذخیره شد:", repoUrl);
+  });
 
   try {
     // دریافت فایل تنظیمات (config.json)
@@ -86,6 +81,19 @@ document.getElementById('githubForm').addEventListener('submit', async function 
   } catch (error) {
     console.error("Error fetching GitHub project:", error);
     showNotification("DeepSync Error", `خطا: ${error.message}`);
+  }
+});
+
+// بازیابی تنظیمات از localStorage
+chrome.storage.local.get(['repo', 'token', 'repoUrl'], function (data) {
+  if (data.repo) {
+    document.getElementById('repo').value = data.repo;
+  }
+  if (data.token) {
+    document.getElementById('token').value = data.token;
+  }
+  if (data.repoUrl) {
+    document.getElementById('repoUrl').value = data.repoUrl;
   }
 });
 
