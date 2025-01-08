@@ -1,41 +1,56 @@
-// تابع برای نمایش نوتیفیکیشن
-function showNotification(title, message) {
-  chrome.runtime.sendMessage({
-    action: "showNotification",
-    title: title,
-    message: message,
-  });
+// تابع نمایش toast
+function showToast(message, isError = false) {
+  const toast = document.createElement("div");
+  toast.textContent = message;
+  toast.style.position = "fixed";
+  toast.style.bottom = "20px";
+  toast.style.right = "20px";
+  toast.style.backgroundColor = isError ? "#ff4444" : "#2d9cdb";
+  toast.style.color = "#fff";
+  toast.style.padding = "10px 20px";
+  toast.style.borderRadius = "4px";
+  toast.style.zIndex = "1000";
+  toast.style.opacity = "0";
+  toast.style.transition = "opacity 0.5s";
+
+  document.body.appendChild(toast);
+
+  // نمایش toast
+  setTimeout(() => {
+    toast.style.opacity = "1";
+  }, 10);
+
+  // مخفی کردن toast پس از 3 ثانیه
+  setTimeout(() => {
+    toast.style.opacity = "0";
+    setTimeout(() => {
+      document.body.removeChild(toast);
+    }, 500);
+  }, 3000);
 }
 
-// تابع برای استخراج نام فایل از نزدیک‌ترین تگ HTML بالای کد بلاک
+// تابع برای استخراج نام فایل
 function extractFileName(codeBlock) {
-  // پیمایش DOM به سمت بالا برای یافتن تگ <strong> حاوی نام فایل
   let element = codeBlock.previousElementSibling;
   while (element) {
-    // بررسی محتوای تگ HTML
     const strongTag = element.querySelector('strong');
     if (strongTag) {
       const codeTag = strongTag.querySelector('code');
       if (codeTag) {
-        return codeTag.innerText.trim(); // بازگرداندن نام فایل
+        return codeTag.innerText.trim();
       }
     }
-
-    // بررسی تگ‌های بالاتر
     element = element.previousElementSibling;
   }
-
-  return null; // اگر نام فایل پیدا نشد
+  return null;
 }
 
 // تابع برای افزودن دکمه "Update Git" کنار دکمه "Copy"
 function addUpdateGitButton(copyButton, codeText, codeBlock) {
-  // بررسی اگر دکمه "Update Git" از قبل وجود دارد
   if (copyButton.parentNode.querySelector(".update-git-button")) {
-    return; // اگر وجود دارد، خروج
+    return;
   }
 
-  // ایجاد دکمه "Update Git"
   const updateGitButton = document.createElement("div");
   updateGitButton.innerText = "Update Git";
   updateGitButton.classList.add("update-git-button");
@@ -48,63 +63,65 @@ function addUpdateGitButton(copyButton, codeText, codeBlock) {
   updateGitButton.style.cursor = "pointer";
   updateGitButton.style.display = "inline-block";
 
-  // افزودن رویداد کلیک به دکمه "Update Git"
   updateGitButton.addEventListener("click", async () => {
-    // دریافت تنظیمات از localStorage
+    updateGitButton.disabled = true; // غیرفعال کردن دکمه
+    updateGitButton.innerText = "Updating..."; // تغییر متن دکمه
+
     chrome.storage.local.get(['repo', 'token'], async function (data) {
       const { repo, token } = data;
 
       if (!repo || !token) {
-        showNotification("DeepSync Error", "لطفاً تنظیمات ریپازیتوری و توکن را وارد کنید.");
+        showToast("Please configure repository and token in settings!", true);
+        updateGitButton.disabled = false; // فعال کردن دکمه
+        updateGitButton.innerText = "Update Git"; // بازگرداندن متن دکمه
         return;
       }
 
-      // استخراج نام فایل از نزدیک‌ترین تگ HTML بالای کد بلاک
       let filePath = extractFileName(codeBlock);
-
-      // اگر نام فایل پیدا نشد، از کاربر بخواهید نام فایل را وارد کند
       if (!filePath) {
-        filePath = prompt("لطفاً مسیر فایل را در مخزن وارد کنید (مثلاً src/index.js):", "index.js");
+        filePath = prompt("Please enter the file path in the repository (e.g., src/index.js):", "index.js");
       }
 
-      // اگر کاربر نام فایل را وارد کرد، فایل را به‌روزرسانی کنید
       if (filePath) {
-        chrome.runtime.sendMessage(
-          {
+        try {
+          const response = await chrome.runtime.sendMessage({
             action: "updateGitFile",
             code: codeText,
             filePath: filePath,
-          },
-          (response) => {
-            if (response.success) {
-              showNotification("DeepSync", `فایل "${filePath}" با موفقیت به‌روزرسانی شد!`);
-              updateGitButton.innerText = "Git Updated";
-              updateGitButton.style.backgroundColor = "#4CAF50";
-              updateGitButton.disabled = true;
-            } else {
-              console.error("Error updating file:", response.error);
-              showNotification("DeepSync Error", `خطا: ${response.error}`);
-            }
+          });
+
+          if (response.success) {
+            // تغییر نام دکمه به "[filename] Updated" و غیرفعال نگه داشتن آن
+            updateGitButton.innerText = `${filePath} Updated`;
+            updateGitButton.style.backgroundColor = "#4CAF50"; // تغییر رنگ به سبز
+            updateGitButton.disabled = true; // غیرفعال نگه داشتن دکمه
+            showToast(`File "${filePath}" updated successfully!`);
+          } else {
+            throw new Error(response.error || "Failed to update file.");
           }
-        );
+        } catch (error) {
+          console.error("Error updating file:", error);
+          showToast(`Error: ${error.message}`, true);
+          updateGitButton.disabled = false; // فعال کردن دکمه
+          updateGitButton.innerText = "Update Git"; // بازگرداندن متن دکمه
+        }
       }
     });
   });
 
-  // افزودن دکمه "Update Git" کنار دکمه "Copy"
   copyButton.parentNode.insertBefore(updateGitButton, copyButton.nextSibling);
 }
 
 // تابع برای تشخیص بلوک‌های کد و افزودن دکمه‌ها
 function detectCodeBlocks() {
-  const codeBlocks = document.querySelectorAll(".md-code-block"); // پیدا کردن تمام بلوک‌های کد
+  const codeBlocks = document.querySelectorAll(".md-code-block");
   codeBlocks.forEach((codeBlock) => {
-    const copyButton = codeBlock.querySelector(".ds-markdown-code-copy-button"); // پیدا کردن دکمه "Copy"
-    const codeElement = codeBlock.querySelector("pre"); // پیدا کردن عنصر <pre> حاوی کد
-    const codeText = codeElement?.innerText; // استخراج متن کد
+    const copyButton = codeBlock.querySelector(".ds-markdown-code-copy-button");
+    const codeElement = codeBlock.querySelector("pre");
+    const codeText = codeElement?.innerText;
 
     if (copyButton && codeText) {
-      addUpdateGitButton(copyButton, codeText, codeBlock); // افزودن دکمه "Update Git"
+      addUpdateGitButton(copyButton, codeText, codeBlock);
     }
   });
 }
@@ -114,15 +131,14 @@ function observeDOMChanges() {
   const observer = new MutationObserver((mutations) => {
     mutations.forEach((mutation) => {
       if (mutation.type === "childList") {
-        detectCodeBlocks(); // تشخیص بلوک‌های کد پس از تغییرات DOM
+        detectCodeBlocks();
       }
     });
   });
 
-  // شروع مشاهده تغییرات در body
   observer.observe(document.body, {
-    childList: true, // مشاهده تغییرات در فرزندان
-    subtree: true, // مشاهده تغییرات در کل زیردرخت
+    childList: true,
+    subtree: true,
   });
 }
 
