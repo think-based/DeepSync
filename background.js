@@ -5,8 +5,19 @@ function encodeUnicodeToBase64(str) {
   }));
 }
 
+// Listen for messages from content.js or popup.js
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === "pullCode") {
+  if (request.action === "showNotification") {
+    // نمایش نوتیفیکیشن
+    chrome.notifications.create({
+      type: "basic",
+      iconUrl: "icon48.png", // آیکون نوتیفیکیشن
+      title: request.title, // عنوان نوتیفیکیشن
+      message: request.message, // پیام نوتیفیکیشن
+    });
+  }
+
+  if (request.action === "updateGitFile" || request.action === "pushCode") {
     // دریافت تنظیمات از localStorage
     chrome.storage.local.get(['repo', 'token'], function (data) {
       const { repo, token } = data;
@@ -69,7 +80,7 @@ function updateFile(url, code, sha, token, sendResponse) {
     .then((response) => response.json())
     .then((data) => {
       console.log("GitHub API Response (Update):", data); // Log the response
-      sendResponse({ success: true, data });
+      sendResponse({ success: true, isNewFile: false, filePath: data.content.path });
     })
     .catch((error) => {
       console.error("Error updating file:", error);
@@ -94,7 +105,7 @@ function createFile(url, code, token, sendResponse) {
     .then((response) => response.json())
     .then((data) => {
       console.log("GitHub API Response (Create):", data); // Log the response
-      sendResponse({ success: true, data });
+      sendResponse({ success: true, isNewFile: true, filePath: data.content.path });
     })
     .catch((error) => {
       console.error("Error creating file:", error);
