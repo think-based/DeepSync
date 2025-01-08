@@ -1,4 +1,4 @@
 {
-  "include": ["*.js", "*.json" , "*.html"], 
-  "exclude": ["*.MD"] 
+  "include": ["*.js", "*.json" , "*.html" , "*.MD"], 
+  "exclude": [] 
 }
