@@ -31,6 +31,22 @@ function showToast(message, isError = false) {
 
 // تابع برای استخراج نام فایل
 function extractFileName(codeBlock) {
+  const codeElement = codeBlock.querySelector("pre");
+  const codeText = codeElement?.innerText;
+
+  // Step 1: Check the first 3 lines of the code for a file name in comments
+  if (codeText) {
+    const lines = codeText.split('\n').slice(0, 3); // Check the first 3 lines
+    for (const line of lines) {
+      // Look for a comment pattern that might contain a file name
+      const commentMatch = line.match(/\/\/\s*File\s*Name:\s*(.+\.\w+)/i); // Matches variations like "//FileName:", "// FileName:", "//File Name:"
+      if (commentMatch) {
+        return commentMatch[1].trim(); // Return the extracted file name
+      }
+    }
+  }
+
+  // Step 2: Check the HTML structure (original logic)
   let element = codeBlock.previousElementSibling;
   while (element) {
     const strongTag = element.querySelector('strong');
@@ -42,7 +58,10 @@ function extractFileName(codeBlock) {
     }
     element = element.previousElementSibling;
   }
-  return null;
+
+  // Step 3: If no file name is found, prompt the user to enter it
+  const filePath = prompt("Please enter the file path in the repository (e.g., src/index.js):", "");
+  return filePath?.trim() || null; // Return the user-provided file path or null if canceled
 }
 
 // تابع برای افزودن دکمه "Update Git" کنار دکمه "Copy"
@@ -79,32 +98,33 @@ function addUpdateGitButton(copyButton, codeText, codeBlock) {
 
       let filePath = extractFileName(codeBlock);
       if (!filePath) {
-        filePath = prompt("Please enter the file path in the repository (e.g., src/index.js):", "");
+        showToast("File path is required!", true);
+        updateGitButton.disabled = false; // فعال کردن دکمه
+        updateGitButton.innerText = "Update Git"; // بازگرداندن متن دکمه
+        return;
       }
 
-      if (filePath) {
-        try {
-          const response = await chrome.runtime.sendMessage({
-            action: "updateGitFile",
-            code: codeText,
-            filePath: filePath,
-          });
+      try {
+        const response = await chrome.runtime.sendMessage({
+          action: "updateGitFile",
+          code: codeText,
+          filePath: filePath,
+        });
 
-          if (response.success) {
-            // تغییر نام دکمه به "[filename] Updated" و غیرفعال نگه داشتن آن
-            updateGitButton.innerText = `${filePath} Updated`;
-            updateGitButton.style.backgroundColor = "#4CAF50"; // تغییر رنگ به سبز
-            updateGitButton.disabled = true; // غیرفعال نگه داشتن دکمه
-            showToast(`File "${filePath}" updated successfully!`);
-          } else {
-            throw new Error(response.error || "Failed to update file.");
-          }
-        } catch (error) {
-          console.error("Error updating file:", error);
-          showToast(`Error: ${error.message}`, true);
-          updateGitButton.disabled = false; // فعال کردن دکمه
-          updateGitButton.innerText = "Update Git"; // بازگرداندن متن دکمه
+        if (response.success) {
+          // تغییر نام دکمه به "[filename] Updated" و غیرفعال نگه داشتن آن
+          updateGitButton.innerText = `${filePath} Updated`;
+          updateGitButton.style.backgroundColor = "#4CAF50"; // تغییر رنگ به سبز
+          updateGitButton.disabled = true; // غیرفعال نگه داشتن دکمه
+          showToast(`File "${filePath}" updated successfully!`);
+        } else {
+          throw new Error(response.error || "Failed to update file.");
         }
+      } catch (error) {
+        console.error("Error updating file:", error);
+        showToast(`Error: ${error.message}`, true);
+        updateGitButton.disabled = false; // فعال کردن دکمه
+        updateGitButton.innerText = "Update Git"; // بازگرداندن متن دکمه
       }
     });
   });
