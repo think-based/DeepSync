@@ -8,7 +8,7 @@ document.getElementById('settingsForm').addEventListener('submit', function (e) 
 
   // ذخیره تنظیمات در localStorage
   chrome.storage.local.set({ repo, token }, function () {
-    alert('تنظیمات با موفقیت ذخیره شد!');
+    showNotification("DeepSync", "تنظیمات با موفقیت ذخیره شد!");
   });
 });
 
@@ -30,55 +30,67 @@ document.getElementById('githubForm').addEventListener('submit', async function 
   const repoPath = repoUrl.replace("https://github.com/", ""); // تبدیل آدرس به مسیر ریپازیتوری
 
   try {
-    // دریافت محتوای ریپازیتوری از GitHub API
-    const response = await fetch(`https://api.github.com/repos/${repoPath}/contents`, {
+    // دریافت فایل تنظیمات (config.json)
+    const configResponse = await fetch(`https://api.github.com/repos/${repoPath}/contents/config.json`, {
       headers: {
         Accept: "application/vnd.github.v3+json",
       },
     });
 
-    if (!response.ok) {
-      throw new Error(`GitHub API error: ${response.status}`);
+    if (!configResponse.ok) {
+      throw new Error("فایل تنظیمات (config.json) یافت نشد!");
     }
 
-    const data = await response.json();
+    const configData = await configResponse.json();
+    const configContent = JSON.parse(atob(configData.content)); // دیکد کردن محتوای Base64
+
+    // دریافت لیست فایل‌ها از ریپازیتوری
+    const repoResponse = await fetch(`https://api.github.com/repos/${repoPath}/contents`, {
+      headers: {
+        Accept: "application/vnd.github.v3+json",
+      },
+    });
+
+    if (!repoResponse.ok) {
+      throw new Error(`GitHub API error: ${repoResponse.status}`);
+    }
+
+    const repoData = await repoResponse.json();
     let combinedText = "";
 
+    // فیلتر کردن فایل‌ها بر اساس تنظیمات
+    const filesToDownload = repoData.filter(item => {
+      const path = item.path;
+      const isIncluded = configContent.include.some(pattern => matchPattern(path, pattern));
+      const isExcluded = configContent.exclude.some(pattern => matchPattern(path, pattern));
+      return isIncluded && !isExcluded;
+    });
+
     // دریافت محتوای هر فایل
-    for (const item of data) {
+    for (const item of filesToDownload) {
       if (item.type === "file") {
         const fileResponse = await fetch(item.download_url);
         const fileContent = await fileResponse.text();
-        combinedText += `\n\n// File: ${item.path}\n${fileContent}`;
+        combinedText += `\n\n// ===== File: ${item.path} =====\n${fileContent}\n// ===== End of File: ${item.path} =====\n`;
       }
     }
 
-    // ارسال متن ترکیبی به فیلد چت
-    chrome.tabs.query({ active: true, currentWindow: true }, function (tabs) {
-      chrome.scripting.executeScript({
-        target: { tabId: tabs[0].id },
-        func: injectTextIntoChat,
-        args: [combinedText],
-      });
+    // انتقال متن به کلیپ‌بورد
+    navigator.clipboard.writeText(combinedText).then(() => {
+      showNotification("DeepSync", "متن با موفقیت به کلیپ‌بورد منتقل شد!");
+    }).catch((error) => {
+      console.error("خطا در انتقال به کلیپ‌بورد:", error);
+      showNotification("DeepSync Error", "خطا در انتقال به کلیپ‌بورد!");
     });
 
-    alert("پروژه با موفقیت دریافت و در چت بارگذاری شد!");
   } catch (error) {
     console.error("Error fetching GitHub project:", error);
-    alert(`خطا: ${error.message}`);
+    showNotification("DeepSync Error", `خطا: ${error.message}`);
   }
 });
 
-// تابع برای تزریق متن به فیلد چت
-function injectTextIntoChat(text) {
-  console.log(text);
-  const chatInput = document.querySelector("#chat-input");
-  if (chatInput) {
-    setTimeout(() => {
-      chatInput.value = text;
-    }, "3000");
-    
-  } else {
-    console.error("فیلد چت پیدا نشد!");
-  }
+// تابع برای تطبیق الگوهای wildcard
+function matchPattern(path, pattern) {
+  const regex = new RegExp(pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*'));
+  return regex.test(path);
 }
