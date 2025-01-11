@@ -64,6 +64,12 @@ function extractFileName(codeBlock) {
   return filePath?.trim() || null; // Return the user-provided file path or null if canceled
 }
 
+// تابع برای نرمال‌سازی مسیر فایل
+function normalizeFilePath(filePath) {
+  // Remove leading slashes and trim whitespace
+  return filePath.replace(/^\//, '').trim();
+}
+
 // تابع برای افزودن دکمه "Update Git" کنار دکمه "Copy"
 function addUpdateGitButton(copyButton, codeText, codeBlock) {
   if (copyButton.parentNode.querySelector(".update-git-button")) {
@@ -83,50 +89,66 @@ function addUpdateGitButton(copyButton, codeText, codeBlock) {
   updateGitButton.style.display = "inline-block";
 
   updateGitButton.addEventListener("click", async () => {
-    updateGitButton.disabled = true; // غیرفعال کردن دکمه
-    updateGitButton.innerText = "Updating..."; // تغییر متن دکمه
+    updateGitButton.disabled = true; // Disable the button
+    updateGitButton.innerText = "Updating..."; // Change button text
 
-    chrome.storage.local.get(['repo', 'token'], async function (data) {
-      const { repo, token } = data;
+    try {
+      // Check if the extension context is still valid
+      if (!chrome.runtime?.id) {
+        throw new Error("Extension context invalidated. Please reload the page.");
+      }
+
+      const { repo, token } = await new Promise((resolve, reject) => {
+        chrome.storage.local.get(['repo', 'token'], (data) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message || "Failed to fetch settings."));
+          } else {
+            resolve(data);
+          }
+        });
+      });
 
       if (!repo || !token) {
-        showToast("Please configure repository and token in settings!", true);
-        updateGitButton.disabled = false; // فعال کردن دکمه
-        updateGitButton.innerText = "Update Git"; // بازگرداندن متن دکمه
-        return;
+        throw new Error("Please configure repository and token in settings!");
       }
 
       let filePath = extractFileName(codeBlock);
       if (!filePath) {
-        showToast("File path is required!", true);
-        updateGitButton.disabled = false; // فعال کردن دکمه
-        updateGitButton.innerText = "Update Git"; // بازگرداندن متن دکمه
-        return;
+        throw new Error("File path is required!");
       }
 
-      try {
-        const response = await chrome.runtime.sendMessage({
-          action: "updateGitFile",
-          code: codeText,
-          filePath: filePath,
-        });
+      // Normalize the file path (remove leading slashes)
+      filePath = normalizeFilePath(filePath);
 
-        if (response.success) {
-          // تغییر نام دکمه به "[filename] Updated" و غیرفعال نگه داشتن آن
-          updateGitButton.innerText = `${filePath} Updated`;
-          updateGitButton.style.backgroundColor = "#4CAF50"; // تغییر رنگ به سبز
-          updateGitButton.disabled = true; // غیرفعال نگه داشتن دکمه
-          showToast(`File "${filePath}" updated successfully!`);
-        } else {
-          throw new Error(response.error || "Failed to update file.");
-        }
-      } catch (error) {
-        console.error("Error updating file:", error);
-        showToast(`Error: ${error.message}`, true);
-        updateGitButton.disabled = false; // فعال کردن دکمه
-        updateGitButton.innerText = "Update Git"; // بازگرداندن متن دکمه
+      const response = await chrome.runtime.sendMessage({
+        action: "updateGitFile",
+        code: codeText,
+        filePath: filePath,
+      });
+
+      if (response.success) {
+        // Change button text to "[filename] Updated" and keep it disabled
+        updateGitButton.innerText = `${filePath} Updated`;
+        updateGitButton.style.backgroundColor = "#4CAF50"; // Change color to green
+        updateGitButton.disabled = true; // Keep the button disabled
+        showToast(`File "${filePath}" updated successfully!`);
+      } else {
+        throw new Error(response.error || "Failed to update file.");
       }
-    });
+    } catch (error) {
+      console.error("Error updating file:", error);
+      showToast(`Error: ${error.message}`, true);
+
+      // Reload the page if the extension context is invalidated
+      if (error.message.includes("Extension context invalidated")) {
+        showToast("Reloading page...", true);
+        setTimeout(() => location.reload(), 2000); // Reload the page after 2 seconds
+      }
+
+      // Re-enable the button and reset its text
+      updateGitButton.disabled = false;
+      updateGitButton.innerText = "Update Git";
+    }
   });
 
   copyButton.parentNode.insertBefore(updateGitButton, copyButton.nextSibling);
