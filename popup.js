@@ -42,6 +42,17 @@ function wildcardToRegex(pattern) {
   return new RegExp(`^${regexPattern}$`, 'i'); // Case-insensitive matching
 }
 
+// Function to decode Base64 while preserving Unicode characters
+function decodeBase64Unicode(base64) {
+  const binaryString = atob(base64); // Decode Base64 to binary string
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  const decodedString = new TextDecoder('utf-8').decode(bytes); // Decode bytes to UTF-8 string
+  return decodedString;
+}
+
 // Fetch a file from GitHub using the API
 async function fetchFileFromGitHub(path, token, repoPath) {
   const url = `https://api.github.com/repos/${repoPath}/contents/${path}`;
@@ -61,7 +72,7 @@ async function fetchFileFromGitHub(path, token, repoPath) {
   }
 
   const data = await response.json();
-  return atob(data.content); // Decode the base64-encoded content
+  return decodeBase64Unicode(data.content); // Use custom function to decode Base64
 }
 
 // Recursive function to fetch files from a directory
@@ -163,7 +174,7 @@ document.getElementById('githubForm').addEventListener('submit', async function 
     }
 
     const configData = await configResponse.json();
-    const configContent = JSON.parse(atob(configData.content));
+    const configContent = JSON.parse(decodeBase64Unicode(configData.content)); // Decode config.json content
 
     // Fetch all files recursively
     const combinedText = await fetchFilesFromDirectory(`https://api.github.com/repos/${repoPath}/contents`, configContent, token, repoPath);
