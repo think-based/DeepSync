@@ -1,3 +1,14 @@
+// Function to decode Base64 while preserving Unicode characters
+function decodeBase64Unicode(base64) {
+  const binaryString = atob(base64); // Decode Base64 to binary string
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+  const decodedString = new TextDecoder('utf-8').decode(bytes); // Decode bytes to UTF-8 string
+  return decodedString;
+}
+
 // Function to encode Unicode strings to Base64
 function encodeUnicodeToBase64(str) {
   return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
@@ -8,7 +19,7 @@ function encodeUnicodeToBase64(str) {
 // Listen for messages from content.js or popup.js
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "updateGitFile" || request.action === "pushCode") {
-    // دریافت تنظیمات از localStorage
+    // Fetch settings from localStorage
     chrome.storage.local.get(['repo', 'token'], function (data) {
       const { repo, token } = data;
       const { code, filePath } = request;
