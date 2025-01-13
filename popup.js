@@ -27,6 +27,42 @@ document.getElementById('settingsForm').addEventListener('submit', function (e) 
   });
 });
 
+// Recursive function to fetch files from a directory
+async function fetchFilesFromDirectory(url, configContent) {
+  const response = await fetch(url, {
+    headers: {
+      Accept: "application/vnd.github.v3+json",
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`GitHub API error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  let combinedText = "";
+
+  for (const item of data) {
+    if (item.type === "file") {
+      // Check if the file matches the include/exclude patterns
+      const isIncluded = configContent.include.some(pattern => item.path.includes(pattern));
+      const isExcluded = configContent.exclude.some(pattern => item.path.includes(pattern));
+
+      if (isIncluded && !isExcluded) {
+        const fileResponse = await fetch(item.download_url);
+        const fileContent = await fileResponse.text();
+        combinedText += `\n\n// ===== File: ${item.path} =====\n${fileContent}\n// ===== End of File: ${item.path} =====\n`;
+      }
+    } else if (item.type === "dir") {
+      // Recursively fetch files from the subdirectory
+      const subDirText = await fetchFilesFromDirectory(item.url, configContent);
+      combinedText += subDirText;
+    }
+  }
+
+  return combinedText;
+}
+
 // Fetch GitHub project
 document.getElementById('githubForm').addEventListener('submit', async function (e) {
   e.preventDefault();
@@ -43,6 +79,7 @@ document.getElementById('githubForm').addEventListener('submit', async function 
   });
 
   try {
+    // Fetch the config.json file
     const configResponse = await fetch(`https://api.github.com/repos/${repoPath}/contents/config.json`, {
       headers: {
         Accept: "application/vnd.github.v3+json",
@@ -56,34 +93,10 @@ document.getElementById('githubForm').addEventListener('submit', async function 
     const configData = await configResponse.json();
     const configContent = JSON.parse(atob(configData.content));
 
-    const repoResponse = await fetch(`https://api.github.com/repos/${repoPath}/contents`, {
-      headers: {
-        Accept: "application/vnd.github.v3+json",
-      },
-    });
+    // Fetch all files recursively
+    const combinedText = await fetchFilesFromDirectory(`https://api.github.com/repos/${repoPath}/contents`, configContent);
 
-    if (!repoResponse.ok) {
-      throw new Error(`GitHub API error: ${repoResponse.status}`);
-    }
-
-    const repoData = await repoResponse.json();
-    let combinedText = "";
-
-    const filesToDownload = repoData.filter(item => {
-      const path = item.path;
-      const isIncluded = configContent.include.some(pattern => matchPattern(path, pattern));
-      const isExcluded = configContent.exclude.some(pattern => matchPattern(path, pattern));
-      return isIncluded && !isExcluded;
-    });
-
-    for (const item of filesToDownload) {
-      if (item.type === "file") {
-        const fileResponse = await fetch(item.download_url);
-        const fileContent = await fileResponse.text();
-        combinedText += `\n\n// ===== File: ${item.path} =====\n${fileContent}\n// ===== End of File: ${item.path} =====\n`;
-      }
-    }
-
+    // Copy the combined text to the clipboard
     navigator.clipboard.writeText(combinedText).then(() => {
       showToast("Text copied to clipboard successfully!");
     }).catch((error) => {
@@ -112,9 +125,3 @@ chrome.storage.local.get(['repo', 'token', 'repoUrl'], function (data) {
     document.getElementById('repoUrl').value = data.repoUrl;
   }
 });
-
-// Wildcard pattern matching
-function matchPattern(path, pattern) {
-  const regex = new RegExp(pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*'));
-  return regex.test(path);
-}
