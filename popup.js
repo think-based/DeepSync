@@ -27,6 +27,15 @@ document.getElementById('settingsForm').addEventListener('submit', function (e) 
   });
 });
 
+// Convert wildcard pattern to regex
+function wildcardToRegex(pattern) {
+  // Escape special regex characters except '*' and '?'
+  const escapedPattern = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
+  // Replace '*' with '.*' and '?' with '.'
+  const regexPattern = escapedPattern.replace(/\*/g, '.*').replace(/\?/g, '.');
+  return new RegExp(`^${regexPattern}$`, 'i'); // Case-insensitive matching
+}
+
 // Recursive function to fetch files from a directory
 async function fetchFilesFromDirectory(url, configContent) {
   const response = await fetch(url, {
@@ -45,8 +54,8 @@ async function fetchFilesFromDirectory(url, configContent) {
   for (const item of data) {
     if (item.type === "file") {
       // Check if the file matches the include/exclude patterns
-      const isIncluded = configContent.include.some(pattern => item.path.includes(pattern));
-      const isExcluded = configContent.exclude.some(pattern => item.path.includes(pattern));
+      const isIncluded = configContent.include.some(pattern => wildcardToRegex(pattern).test(item.path));
+      const isExcluded = configContent.exclude.some(pattern => wildcardToRegex(pattern).test(item.path));
 
       if (isIncluded && !isExcluded) {
         const fileResponse = await fetch(item.download_url);
