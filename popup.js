@@ -142,6 +142,11 @@ document.getElementById('githubForm').addEventListener('submit', async function 
 
   console.log("Extracted repoPath:", repoPath); // Log the extracted repoPath
 
+  // Save the GitHub Project URL to storage
+  chrome.storage.local.set({ repoUrl }, function () {
+    console.log("Repository URL saved:", repoUrl);
+  });
+
   try {
     // Fetch the token from storage
     const { token } = await new Promise((resolve, reject) => {
@@ -196,7 +201,7 @@ document.getElementById('githubForm').addEventListener('submit', async function 
   }
 });
 
-// Load saved settings
+// Load saved settings when the popup opens
 chrome.storage.local.get(['repo', 'token', 'repoUrl'], function (data) {
   if (data.repo) {
     document.getElementById('repo').value = data.repo;
