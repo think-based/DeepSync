@@ -38,10 +38,22 @@ function extractFileName(codeBlock) {
   if (codeText) {
     const lines = codeText.split('\n').slice(0, 3); // Check the first 3 lines
     for (const line of lines) {
-      // Look for a comment pattern that might contain a file name
-      const commentMatch = line.match(/\/\/\s*File\s*Name:\s*(.+\.\w+)/i); // Matches variations like "//FileName:", "// FileName:", "//File Name:"
-      if (commentMatch) {
-        return commentMatch[1].trim(); // Return the extracted file name
+      // Look for a JavaScript-style comment pattern (e.g., // FileName:)
+      const jsCommentMatch = line.match(/\/\/\s*File\s*Name:\s*(.+\.\w+)/i);
+      if (jsCommentMatch) {
+        return jsCommentMatch[1].trim(); // Return the extracted file name
+      }
+
+      // Look for an HTML-style comment pattern (e.g., <!-- FileName: -->)
+      const htmlCommentMatch = line.match(/<!--\s*File\s*Name:\s*(.+\.\w+)\s*-->/i);
+      if (htmlCommentMatch) {
+        return htmlCommentMatch[1].trim(); // Return the extracted file name
+      }
+
+      // Look for a block-style comment pattern (e.g., /* FileName: */)
+      const blockCommentMatch = line.match(/\/\*\s*File\s*Name:\s*(.+\.\w+)\s*\*\//i);
+      if (blockCommentMatch) {
+        return blockCommentMatch[1].trim(); // Return the extracted file name
       }
     }
   }
@@ -119,6 +131,20 @@ function addUpdateGitButton(copyButton, codeText, codeBlock) {
 
       // Normalize the file path (remove leading slashes)
       filePath = normalizeFilePath(filePath);
+
+      // Wait for the code block content to be fully loaded
+      const codeElement = codeBlock.querySelector("pre");
+      let codeText = codeElement?.innerText;
+
+      // If the code block content is not fully loaded, wait and retry
+      if (!codeText || codeText.trim() === "") {
+        await new Promise((resolve) => setTimeout(resolve, 500)); // Wait 500ms
+        codeText = codeElement?.innerText; // Try reading the content again
+      }
+
+      if (!codeText || codeText.trim() === "") {
+        throw new Error("Failed to read code block content. Please try again.");
+      }
 
       const response = await chrome.runtime.sendMessage({
         action: "updateGitFile",
