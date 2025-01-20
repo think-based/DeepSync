@@ -15,7 +15,8 @@
     {
       "matches": [
         "https://chat.openai.com/*",
-        "https://chat.deepseek.com/*"
+        "https://chat.deepseek.com/*",
+        "https://aistudio.google.com/*" // Added AI Studio URL
       ],
       "js": ["content.js"]
     }
