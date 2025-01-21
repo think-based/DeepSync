@@ -1,4 +1,4 @@
-      // Be Naame Khoda
+// Be Naame Khoda
 // FileName: content.js
 
 // تابع نمایش toast
