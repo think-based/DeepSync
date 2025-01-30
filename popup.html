@@ -1,46 +1,117 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DeepSync Menu</title>
-    <link rel="stylesheet" href="popup.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DeepSync Menu</title>
+    <style>
+        body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        direction: ltr;
+        padding: 20px;
+        width: 300px;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+        }
+        .form-group {
+        margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        input[type="text"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button {
+            width: 100%;
+            padding: 10px;
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #218838;
+        }
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section h2 {
+        font-size: 18px;
+            color: #444;
+            margin-bottom: 10px;
+        }
+        .toast {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #4CAF50;
+            color: white;
+            text-align: center;
+            border-radius: 4px;
+            padding: 16px;
+            position: fixed;
+            z-index: 1;
+            right: 20px;
+            top: 20px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.5s, visibility 0.5s;
+        }
+        .toast.show {
+            visibility: visible;
+            opacity: 1;
+        }
+        .toast.error {
+            background-color: #ff4444;
+        }
+    </style>
 </head>
 <body>
-  <h1>DeepSync Menu</h1>
+    <h1>DeepSync Menu</h1>
 
-  <!-- Toast Container -->
-  <div id="toast" class="toast"></div>
+    <!-- Toast Container -->
+    <div id="toast" class="toast"></div>
 
-  <!-- Settings Section -->
-  <div class="section">
-    <h2>Settings</h2>
-    <form id="settingsForm">
-      <div class="form-group">
-        <label for="repo">Repository Name:</label>
-        <input type="text" id="repo" name="repo" required>
-      </div>
-      <div class="form-group">
-        <label for="token">GitHub Token:</label>
-        <input type="text" id="token" name="token" required>
-      </div>
-      <button type="submit">Save Settings</button>
-    </form>
-  </div>
+    <!-- Settings Section -->
+    <div class="section">
+        <h2>Settings</h2>
+        <form id="settingsForm">
+            <div class="form-group">
+                <label for="repo">Repository Name:</label>
+                <select id="repo" name="repo" required>
+                    <option value="">Select a repository</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="token">GitHub Token:</label>
+                <input type="text" id="token" name="token" required>
+            </div>
+            <button type="submit">Save Settings</button>
+        </form>
+    </div>
 
-  <!-- GitHub Project Fetch Section -->
-  <div class="section">
-    <h2>Fetch GitHub Project</h2>
-    <form id="githubForm">
-        <div class="form-group">
-            <label for="repoUrl">GitHub Project URL:</label>
-            <input type="text" id="repoUrl" name="repoUrl" placeholder="https://github.com/username/repo" required>
-        </div>
-        <p>⚠️ Ensure a <code>config.json</code> file exists in the root of your repository.</p>
-      <button type="submit" id="fetchButton">Fetch Project</button>
-    </form>
-  </div>
-
-  <script src="popup.js" type="module"></script>
+    <!-- Fetch Project Section -->
+    <div class="section">
+        <h2>Fetch GitHub Project</h2>
+        <button id="fetchButton">Fetch Project</button>
+    </div>
+    <script src="popup.js"></script>
 </body>
 </html>
