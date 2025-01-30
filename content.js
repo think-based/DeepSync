@@ -187,7 +187,7 @@ function showToast(message, isError = false) {
     codeBlocks.forEach((codeBlock) => {
       const copyButton = findCopyButton(codeBlock);
       const codeElement = findCodeElement(codeBlock);
-      const codeText = codeElement?.textContent;
+      let codeText = codeElement?.textContent?.trim();
   
       if (copyButton && codeText) {
         addUpdateGitButton(copyButton, codeBlock);
