@@ -1,3 +1,6 @@
+// Be Naame Khoda
+// FileName: background.js
+
 // Function to decode Base64 while preserving Unicode characters
 function decodeBase64Unicode(base64) {
   const binaryString = atob(base64); // Decode Base64 to binary string
@@ -91,57 +94,55 @@ async function getDecryptedToken() {
 // Listen for messages from content.js or popup.js
 chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
   if (request.action === "updateGitFile" || request.action === "pushCode") {
-    // Fetch settings from localStorage
-    const { repo } = await new Promise((resolve) => {
-      chrome.storage.local.get(['repo'], resolve);
-    });
-
-    if (!repo) {
-      sendResponse({ success: false, error: "Repository not configured." });
-      return true;
-    }
-
-    const token = await getDecryptedToken();
-    if (!token) {
-      sendResponse({ success: false, error: "Failed to decrypt token." });
-      return true;
-    }
-
-    const { code, filePath } = request;
-    const url = `https://api.github.com/repos/${repo}/contents/${filePath}`;
-
-    console.log("Sending request to GitHub API...");
-    console.log("URL:", url);
-    console.log("Code:", code);
-    console.log("FilePath:", filePath);
-
-    // Fetch the file's SHA (if it exists)
-    fetch(url, {
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: "application/vnd.github.v3+json",
-      },
-    })
-      .then((response) => {
-        console.log("GitHub API Response Status:", response.status);
-        if (response.status === 200) {
-          return response.json().then((data) => {
-            console.log("File exists. SHA:", data.sha);
-            // File exists, update it
-            updateFile(url, code, data.sha, token, sendResponse);
-          });
-        } else if (response.status === 404) {
-          console.log("File does not exist. Creating new file...");
-          // File doesn't exist, create it
-          createFile(url, code, token, sendResponse);
-        } else {
-          throw new Error(`GitHub API error: ${response.status} - ${response.statusText}`);
-        }
-      })
-      .catch((error) => {
-        console.error("GitHub API Error:", error);
-        sendResponse({ success: false, error: error.message });
+    try {
+      // Fetch settings from localStorage
+      const { repo } = await new Promise((resolve) => {
+        chrome.storage.local.get(['repo'], resolve);
       });
+
+      if (!repo) {
+        sendResponse({ success: false, error: "Repository not configured." });
+        return true;
+      }
+
+      const token = await getDecryptedToken();
+      if (!token) {
+        sendResponse({ success: false, error: "Failed to decrypt token." });
+        return true;
+      }
+
+      const { code, filePath } = request;
+      const url = `https://api.github.com/repos/${repo}/contents/${filePath}`;
+
+      console.log("Sending request to GitHub API...");
+      console.log("URL:", url);
+      console.log("Code:", code);
+      console.log("FilePath:", filePath);
+
+      // Fetch the file's SHA (if it exists)
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `token ${token}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+      });
+
+      if (response.status === 200) {
+        const data = await response.json();
+        console.log("File exists. SHA:", data.sha);
+        // File exists, update it
+        await updateFile(url, code, data.sha, token, sendResponse);
+      } else if (response.status === 404) {
+        console.log("File does not exist. Creating new file...");
+        // File doesn't exist, create it
+        await createFile(url, code, token, sendResponse);
+      } else {
+        throw new Error(`GitHub API error: ${response.status} - ${response.statusText}`);
+      }
+    } catch (error) {
+      console.error("Error:", error);
+      sendResponse({ success: false, error: error.message });
+    }
 
     return true; // Required for async sendResponse
   }
