@@ -1,29 +1,25 @@
-// Function to decode Base64 while preserving Unicode characters
-function decodeBase64Unicode(base64) {
-  const binaryString = atob(base64); // Decode Base64 to binary string
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  const decodedString = new TextDecoder('utf-8').decode(bytes); // Decode bytes to UTF-8 string
-  return decodedString;
-}
+import { decodeBase64Unicode, encodeUnicodeToBase64 } from './utils.js';
 
-// Function to encode Unicode strings to Base64
-function encodeUnicodeToBase64(str) {
-  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
-    return String.fromCharCode('0x' + p1);
-  }));
-}
+const GITHUB_API_BASE = 'https://api.github.com';
+const EXTENSION_UPDATE_MESSAGE = "Update file via DeepSync Chrome Extension";
+const EXTENSION_CREATE_MESSAGE = "Create new file via DeepSync Chrome Extension";
 
 // Listen for messages from content.js or popup.js
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "updateGitFile" || request.action === "pushCode") {
-    // Fetch settings from localStorage
     chrome.storage.local.get(['repo', 'token'], function (data) {
       const { repo, token } = data;
       const { code, filePath } = request;
-      const url = `https://api.github.com/repos/${repo}/contents/${filePath}`;
+
+      if (!repo || !token) {
+        sendResponse({ success: false, error: 'Repository name or GitHub token not configured.' });
+        return;
+      }
+
+      const encodedRepoPath = encodeURIComponent(repo);
+      const encodedFilePath = filePath.split('/').map(encodeURIComponent).join('/');
+
+      const url = `${GITHUB_API_BASE}/repos/${encodedRepoPath}/contents/${encodedFilePath}`;
 
       console.log("Sending request to GitHub API...");
       console.log("URL:", url);
@@ -38,19 +34,21 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         },
       })
         .then((response) => {
-          console.log("GitHub API Response Status:", response.status);
+            console.log("GitHub API Response Status:", response.status);
           if (response.status === 200) {
-            return response.json().then((data) => {
-              console.log("File exists. SHA:", data.sha);
-              // File exists, update it
-              updateFile(url, code, data.sha, token, sendResponse);
+              return response.json().then((data) => {
+                  console.log("File exists. SHA:", data.sha);
+                // File exists, update it
+                  updateFile(url, code, data.sha, token, sendResponse);
             });
           } else if (response.status === 404) {
-            console.log("File does not exist. Creating new file...");
+              console.log("File does not exist. Creating new file...");
             // File doesn't exist, create it
             createFile(url, code, token, sendResponse);
           } else {
-            throw new Error(`GitHub API error: ${response.status} - ${response.statusText}`);
+              return response.text().then(text => {
+                  throw new Error(`GitHub API error: ${response.status} - ${response.statusText} ${text}`);
+              })
           }
         })
         .catch((error) => {
@@ -73,53 +71,57 @@ function updateFile(url, code, sha, token, sendResponse) {
       Accept: "application/vnd.github.v3+json",
     },
     body: JSON.stringify({
-      message: "Update file via DeepSync Chrome Extension",
+      message: EXTENSION_UPDATE_MESSAGE,
       content: encodeUnicodeToBase64(code), // Encode code in Base64
       sha: sha,
     }),
   })
     .then((response) => {
       if (!response.ok) {
-        throw new Error(`GitHub API error: ${response.status} - ${response.statusText}`);
+          return response.text().then(text => {
+          throw new Error(`GitHub API error: ${response.status} - ${response.statusText} ${text}`);
+        });
       }
-      return response.json();
+        return response.json();
     })
     .then((data) => {
-      console.log("GitHub API Response (Update):", data); // Log the response
-      sendResponse({ success: true, isNewFile: false, filePath: data.content.path });
+        console.log("GitHub API Response (Update):", data); // Log the response
+        sendResponse({ success: true, isNewFile: false, filePath: data.content.path });
     })
     .catch((error) => {
-      console.error("Error updating file:", error);
-      sendResponse({ success: false, error: error.message });
+        console.error("Error updating file:", error);
+        sendResponse({ success: false, error: error.message });
     });
 }
 
 // Function to create a new file
 function createFile(url, code, token, sendResponse) {
-  console.log("Creating new file...");
-  fetch(url, {
+    console.log("Creating new file...");
+    fetch(url, {
     method: "PUT",
     headers: {
-      Authorization: `token ${token}`,
-      Accept: "application/vnd.github.v3+json",
+        Authorization: `token ${token}`,
+        Accept: "application/vnd.github.v3+json",
     },
     body: JSON.stringify({
-      message: "Create new file via DeepSync Chrome Extension",
-      content: encodeUnicodeToBase64(code), // Encode code in Base64
+        message: EXTENSION_CREATE_MESSAGE,
+        content: encodeUnicodeToBase64(code), // Encode code in Base64
     }),
-  })
+    })
     .then((response) => {
-      if (!response.ok) {
-        throw new Error(`GitHub API error: ${response.status} - ${response.statusText}`);
-      }
-      return response.json();
+        if (!response.ok) {
+            return response.text().then(text => {
+                throw new Error(`GitHub API error: ${response.status} - ${response.statusText} ${text}`);
+            });
+        }
+        return response.json();
     })
     .then((data) => {
-      console.log("GitHub API Response (Create):", data); // Log the response
-      sendResponse({ success: true, isNewFile: true, filePath: data.content.path });
+        console.log("GitHub API Response (Create):", data);
+        sendResponse({ success: true, isNewFile: true, filePath: data.content.path });
     })
     .catch((error) => {
-      console.error("Error creating file:", error);
-      sendResponse({ success: false, error: error.message });
+        console.error("Error creating file:", error);
+        sendResponse({ success: false, error: error.message });
     });
 }

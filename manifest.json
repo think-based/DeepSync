@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DeepSync",
-  "version": "1.0",
+  "version": "1.5",
   "description": "Sync code blocks from chat platforms to GitHub.",
   "permissions": ["activeTab", "scripting", "storage", "clipboardWrite"],
   "host_permissions": [
@@ -16,7 +16,7 @@
       "matches": [
         "https://chat.openai.com/*",
         "https://chat.deepseek.com/*",
-        "https://aistudio.google.com/*" // Added AI Studio URL
+        "https://aistudio.google.com/*" 
       ],
       "js": ["content.js"]
     }

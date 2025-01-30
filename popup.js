@@ -1,25 +1,26 @@
-// تابع نمایش toast
+import { decodeBase64Unicode, wildcardToRegex } from './utils.js';
+
+const GITHUB_API_BASE = 'https://api.github.com';
+const CONFIG_FILE_NAME = 'config.json';
+
 function showToast(message, isError = false) {
   const toast = document.getElementById('toast');
   toast.textContent = message;
   toast.className = 'toast';
-
   if (isError) {
     toast.classList.add('error');
   }
-
-  toast.classList.add('show');
-
+    toast.classList.add('show');
   setTimeout(() => {
     toast.classList.remove('show');
-  }, 5000); // Increase timeout to 5 seconds for better readability
+  }, 5000);
 }
 
-// Save settings
-document.getElementById('settingsForm').addEventListener('submit', function (e) {
-  e.preventDefault();
 
-  const repo = document.getElementById('repo').value;
+document.getElementById('settingsForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+
+    const repo = document.getElementById('repo').value;
   const token = document.getElementById('token').value;
 
   chrome.storage.local.set({ repo, token }, function () {
@@ -27,81 +28,54 @@ document.getElementById('settingsForm').addEventListener('submit', function (e) 
   });
 });
 
-// Convert wildcard pattern to regex
-function wildcardToRegex(pattern) {
-  // Escape special regex characters except '*' and '?'
-  const escapedPattern = pattern.replace(/[.+^${}()|[\]\\]/g, '\\$&');
-  // Replace '*' with '.*' and '?' with '.'
-  let regexPattern = escapedPattern.replace(/\*/g, '.*').replace(/\?/g, '.');
 
-  // If the pattern does not start with '*' and does not contain '/', treat it as a file name match at any directory level
-  if (!pattern.startsWith('*') && !pattern.includes('/')) {
-    regexPattern = `(.*\/)?${regexPattern}`; // Match at any directory level or root
-  }
-
-  return new RegExp(`^${regexPattern}$`, 'i'); // Case-insensitive matching
-}
-
-// Function to decode Base64 while preserving Unicode characters
-function decodeBase64Unicode(base64) {
-  const binaryString = atob(base64); // Decode Base64 to binary string
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  const decodedString = new TextDecoder('utf-8').decode(bytes); // Decode bytes to UTF-8 string
-  return decodedString;
-}
-
-// Fetch a file from GitHub using the API
 async function fetchFileFromGitHub(path, token, repoPath) {
-  const url = `https://api.github.com/repos/${repoPath}/contents/${path}`;
-  const headers = {
-    Accept: "application/vnd.github.v3+json",
-  };
+  const encodedPath = path.split('/').map(encodeURIComponent).join('/');
+    const encodedRepoPath = encodeURIComponent(repoPath);
+  const url = `${GITHUB_API_BASE}/repos/${encodedRepoPath}/contents/${encodedPath}`;
+    const headers = {
+        Accept: "application/vnd.github.v3+json",
+    };
 
-  if (token) {
-    headers.Authorization = `token ${token}`;
-  }
+    if (token) {
+        headers.Authorization = `token ${token}`;
+    }
 
-  const response = await fetch(url, { headers });
-
-  if (!response.ok) {
-    const errorDetails = await response.text(); // Get the response body for more details
-    throw new Error(`Failed to fetch file: ${url}\nStatus: ${response.status} - ${response.statusText}\nDetails: ${errorDetails}`);
-  }
-
-  const data = await response.json();
-  return decodeBase64Unicode(data.content); // Use custom function to decode Base64
-}
-
-// Recursive function to fetch files from a directory
-async function fetchFilesFromDirectory(url, configContent, token, repoPath) {
-  const headers = {
-    Accept: "application/vnd.github.v3+json",
-  };
-
-  // Add authorization header if a token is provided
-  if (token) {
-    headers.Authorization = `token ${token}`;
-  }
-
-  try {
-    console.log(`Fetching URL: ${url}`); // Log the URL being fetched
     const response = await fetch(url, { headers });
-
     if (!response.ok) {
-      const errorDetails = await response.text(); // Get the response body for more details
-      throw new Error(`GitHub API error: ${response.status} - ${response.statusText}\nURL: ${url}\nDetails: ${errorDetails}`);
+        const errorDetails = await response.text();
+        throw new Error(`Failed to fetch file: ${path}\nStatus: ${response.status} - ${response.statusText}\nDetails: ${errorDetails}`);
     }
 
     const data = await response.json();
+    return decodeBase64Unicode(data.content); // Use custom function to decode Base64
+}
+
+
+async function fetchFilesFromDirectory(url, configContent, token, repoPath) {
+    const headers = {
+        Accept: "application/vnd.github.v3+json",
+    };
+
+    if (token) {
+        headers.Authorization = `token ${token}`;
+    }
+
+  try {
+        console.log(`Fetching URL: ${url}`); // Log the URL being fetched
+    const response = await fetch(url, { headers });
+
+    if (!response.ok) {
+        const errorDetails = await response.text(); // Get the response body for more details
+        throw new Error(`GitHub API error: ${response.status} - ${response.statusText}\nURL: ${url}\nDetails: ${errorDetails}`);
+    }
+    const data = await response.json();
     let combinedText = "";
 
-    for (const item of data) {
-      if (item.type === "file") {
-        // Check if the file matches the include/exclude patterns
-        const isIncluded = configContent.include.some(pattern => wildcardToRegex(pattern).test(item.path));
+      for (const item of data) {
+        if (item.type === "file") {
+          // Check if the file matches the include/exclude patterns
+            const isIncluded = configContent.include.some(pattern => wildcardToRegex(pattern).test(item.path));
         const isExcluded = configContent.exclude.some(pattern => wildcardToRegex(pattern).test(item.path));
 
         if (isIncluded && !isExcluded) {
@@ -110,7 +84,6 @@ async function fetchFilesFromDirectory(url, configContent, token, repoPath) {
           combinedText += `\n\n// ===== File: ${item.path} =====\n${fileContent}\n// ===== End of File: ${item.path} =====\n`;
         }
       } else if (item.type === "dir") {
-        // Recursively fetch files from the subdirectory
         const subDirText = await fetchFilesFromDirectory(item.url, configContent, token, repoPath);
         combinedText += subDirText;
       }
@@ -118,12 +91,12 @@ async function fetchFilesFromDirectory(url, configContent, token, repoPath) {
 
     return combinedText;
   } catch (error) {
-    console.error("Error fetching files from directory:", error);
-    throw error;
+      console.error("Error fetching files from directory:", error);
+      throw error;
   }
 }
 
-// Fetch GitHub project
+
 document.getElementById('githubForm').addEventListener('submit', async function (e) {
   e.preventDefault();
 
@@ -133,83 +106,76 @@ document.getElementById('githubForm').addEventListener('submit', async function 
 
   const repoUrl = document.getElementById('repoUrl').value;
 
-  // Extract repoPath from the URL (e.g., "https://github.com/username/repo" -> "username/repo")
   let repoPath = repoUrl.replace("https://github.com/", "").replace(/\/$/, ""); // Remove trailing slash
   if (repoPath.includes("/tree/") || repoPath.includes("/blob/")) {
-    // Handle URLs with branch or file paths
     repoPath = repoPath.split("/").slice(0, 2).join("/");
   }
 
-  console.log("Extracted repoPath:", repoPath); // Log the extracted repoPath
-
-  // Save the GitHub Project URL to storage
-  chrome.storage.local.set({ repoUrl }, function () {
-    console.log("Repository URL saved:", repoUrl);
-  });
+    console.log("Extracted repoPath:", repoPath); // Log the extracted repoPath
+    chrome.storage.local.set({ repoUrl }, function () {
+        console.log("Repository URL saved:", repoUrl);
+    });
 
   try {
-    // Fetch the token from storage
     const { token } = await new Promise((resolve, reject) => {
       chrome.storage.local.get(['token'], (data) => {
-        if (chrome.runtime.lastError) {
-          reject(new Error(chrome.runtime.lastError.message || "Failed to fetch token."));
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message || "Failed to fetch token."));
         } else {
-          resolve(data);
+            resolve(data);
         }
       });
     });
 
-    if (!token) {
-      throw new Error("GitHub token is missing. Please configure it in settings.");
+      if (!token) {
+          throw new Error("GitHub token is missing. Please configure it in settings.");
     }
-
-    // Fetch the config.json file
-    const configUrl = `https://api.github.com/repos/${repoPath}/contents/config.json`;
-    console.log(`Fetching config file: ${configUrl}`); // Log the config file URL
-    const configResponse = await fetch(configUrl, {
-      headers: {
-        Accept: "application/vnd.github.v3+json",
-        Authorization: `token ${token}`,
-      },
+        const encodedRepoPath = encodeURIComponent(repoPath);
+    const configUrl = `${GITHUB_API_BASE}/repos/${encodedRepoPath}/contents/${CONFIG_FILE_NAME}`;
+    console.log(`Fetching config file: ${configUrl}`);
+      const configResponse = await fetch(configUrl, {
+        headers: {
+          Accept: "application/vnd.github.v3+json",
+            Authorization: `token ${token}`,
+        },
     });
 
-    if (!configResponse.ok) {
-      const errorDetails = await configResponse.text(); // Get the response body for more details
-      throw new Error(`Failed to fetch config file: ${configUrl}\nStatus: ${configResponse.status} - ${configResponse.statusText}\nDetails: ${errorDetails}`);
+      if (!configResponse.ok) {
+          const errorDetails = await configResponse.text();
+        throw new Error(`Failed to fetch config file: ${CONFIG_FILE_NAME}\nStatus: ${configResponse.status} - ${configResponse.statusText}\nDetails: ${errorDetails}`);
     }
 
+
     const configData = await configResponse.json();
-    const configContent = JSON.parse(decodeBase64Unicode(configData.content)); // Decode config.json content
+    const configContent = JSON.parse(decodeBase64Unicode(configData.content));
 
-    // Fetch all files recursively
-    const combinedText = await fetchFilesFromDirectory(`https://api.github.com/repos/${repoPath}/contents`, configContent, token, repoPath);
 
-    // Copy the combined text to the clipboard
-    navigator.clipboard.writeText(combinedText).then(() => {
-      showToast("Text copied to clipboard successfully!");
-    }).catch((error) => {
-      console.error("Clipboard error:", error);
-      showToast("Failed to copy text to clipboard!", true);
+      const combinedText = await fetchFilesFromDirectory(`${GITHUB_API_BASE}/repos/${encodedRepoPath}/contents`, configContent, token, repoPath);
+
+        navigator.clipboard.writeText(combinedText).then(() => {
+            showToast("Text copied to clipboard successfully!");
+      }).catch((error) => {
+          console.error("Clipboard error:", error);
+        showToast("Failed to copy text to clipboard!", true);
     });
 
   } catch (error) {
     console.error("Error fetching GitHub project:", error);
-    showToast(`Error: ${error.message}`, true); // Show detailed error message in toast
+      showToast(`Error: ${error.message}`, true);
   } finally {
     fetchButton.disabled = false;
     fetchButton.innerText = "Fetch Project";
   }
 });
 
-// Load saved settings when the popup opens
 chrome.storage.local.get(['repo', 'token', 'repoUrl'], function (data) {
   if (data.repo) {
-    document.getElementById('repo').value = data.repo;
+      document.getElementById('repo').value = data.repo;
   }
   if (data.token) {
-    document.getElementById('token').value = data.token;
+      document.getElementById('token').value = data.token;
   }
   if (data.repoUrl) {
-    document.getElementById('repoUrl').value = data.repoUrl;
+      document.getElementById('repoUrl').value = data.repoUrl;
   }
 });
