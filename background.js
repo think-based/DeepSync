@@ -102,13 +102,13 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
 
       if (!repo) {
         sendResponse({ success: false, error: "Repository not configured." });
-        return true;
+        return true; // Indicate async response
       }
 
       const token = await getDecryptedToken();
       if (!token) {
         sendResponse({ success: false, error: "Failed to decrypt token." });
-        return true;
+        return true; // Indicate async response
       }
 
       const { code, filePath } = request;
@@ -144,7 +144,7 @@ chrome.runtime.onMessage.addListener(async (request, sender, sendResponse) => {
       sendResponse({ success: false, error: error.message });
     }
 
-    return true; // Required for async sendResponse
+    return true; // Indicate async response
   }
 });
 
