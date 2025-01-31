@@ -1,0 +1,37 @@
+async function handleGitHubFile(url, code, token, sendResponse) {
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: "application/vnd.github.v3+json",
+      },
+    });
+
+    if (response.status === 200) {
+      const data = await response.json();
+      console.log("File exists. SHA:", data.sha);
+      updateFile(url, code, data.sha, token, sendResponse);
+    } else if (response.status === 404) {
+      console.log("File does not exist. Creating new file...");
+      createFile(url, code, token, sendResponse);
+    } else {
+      const errorDetails = await response.text();
+      console.error(
+        `GitHub API error: ${response.status} - ${response.statusText}\nDetails: ${errorDetails}`
+      );
+      sendResponse({
+        success: false,
+        error: `GitHub API error: ${response.status} - ${response.statusText}\nDetails: ${errorDetails}`,
+      });
+    }
+  } catch (error) {
+    console.error("Fetch error:", error);
+    sendResponse({
+      success: false,
+      error: `Fetch error: ${error.message}`,
+    });
+  }
+}
+
+// Example usage:
+// handleGitHubFile(url, code, token, sendResponse);
