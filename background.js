@@ -1,13 +1,11 @@
-      // Function to decode Base64 while preserving Unicode characters
+// Be Naame Khoda
+// FileName: background.js
+
+// Function to decode Base64 while preserving Unicode characters
 function decodeBase64Unicode(base64) {
   try {
     const binaryString = atob(base64);
-    const bytes = new Uint8Array(binaryString.length);
-    for (let i = 0; i < binaryString.length; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    const decodedString = new TextDecoder("utf-8").decode(bytes);
-    return decodedString;
+    return new TextDecoder("utf-8").decode(new Uint8Array([...binaryString].map(c => c.charCodeAt(0))));
   } catch (error) {
     console.error("Base64 Decoding Error:", error);
     return null;
@@ -73,29 +71,97 @@ async function decryptToken(encryptedToken, key) {
 
 // Function to get decrypted token from storage
 async function getDecryptedToken() {
-    const { token, salt } = await new Promise((resolve) => {
-        chrome.storage.local.get(["token", "salt"], resolve);
+  const { token, salt } = await new Promise((resolve) => {
+    chrome.storage.local.get(["token", "salt"], resolve);
+  });
+
+  if (!token || !salt) {
+    console.error("No token or salt found in storage.");
+    return null;
+  }
+
+  const password = chrome.runtime.id; // Use the extension ID as password
+  try {
+    const generatedKey = await generateKey(password, salt);
+    const decryptedToken = await decryptToken(token, generatedKey);
+    if (!decryptedToken) {
+      console.error("Failed to decrypt token.");
+      return null;
+    }
+    return decryptedToken;
+  } catch (error) {
+    console.error("Error during key or token decryption:", error);
+    return null;
+  }
+}
+
+// Function to update an existing file
+async function updateFile(url, code, sha, token, sendResponse) {
+  console.log("Updating file...");
+  try {
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: "application/vnd.github.v3+json",
+      },
+      body: JSON.stringify({
+        message: "Update file via DeepSync Chrome Extension",
+        content: encodeUnicodeToBase64(code),
+        sha: sha,
+      }),
     });
 
-    if (!token || !salt) {
-      console.error("No token or salt found in storage.");
-        return null;
+    if (!response.ok) {
+      const errorDetails = await response.text();
+      throw new Error(`GitHub API error: ${response.status} - ${response.statusText}\nDetails: ${errorDetails}`);
     }
 
-    const password = chrome.runtime.id; // Use the extension ID as password
-    try {
-         const generatedKey = await generateKey(password, salt);
-        const decryptedToken = await decryptToken(token, generatedKey);
-        if (!decryptedToken) {
-          console.error("Failed to decrypt token.");
-           return null;
-        }
-         return decryptedToken;
+    const data = await response.json();
+    console.log("GitHub API Response (Update):", data);
+    sendResponse({
+      success: true,
+      isNewFile: false,
+      filePath: data.content.path,
+    });
+  } catch (error) {
+    console.error("Error updating file:", error);
+    sendResponse({ success: false, error: error.message });
+  }
+}
+
+// Function to create a new file
+async function createFile(url, code, token, sendResponse) {
+  console.log("Creating new file...");
+  try {
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        Authorization: `token ${token}`,
+        Accept: "application/vnd.github.v3+json",
+      },
+      body: JSON.stringify({
+        message: "Create new file via DeepSync Chrome Extension",
+        content: encodeUnicodeToBase64(code),
+      }),
+    });
+
+    if (!response.ok) {
+      const errorDetails = await response.text();
+      throw new Error(`GitHub API error: ${response.status} - ${response.statusText}\nDetails: ${errorDetails}`);
     }
-    catch(error){
-         console.error("Error during key or token decryption:", error);
-         return null;
-    }
+
+    const data = await response.json();
+    console.log("GitHub API Response (Create):", data);
+    sendResponse({
+      success: true,
+      isNewFile: true,
+      filePath: data.content.path,
+    });
+  } catch (error) {
+    console.error("Error creating file:", error);
+    sendResponse({ success: false, error: error.message });
+  }
 }
 
 // Listen for messages from content.js or popup.js
@@ -114,11 +180,12 @@ chrome.runtime.onMessage.addListener(
           });
           return true;
         }
-           const token = await getDecryptedToken();
-          if (!token) {
-              sendResponse({ success: false, error: "Failed to decrypt token." });
-               return true;
-          }
+
+        const token = await getDecryptedToken();
+        if (!token) {
+          sendResponse({ success: false, error: "Failed to decrypt token." });
+          return true;
+        }
 
         const { code, filePath } = request;
         const url = `https://api.github.com/repos/${repo}/contents/${filePath}`;
@@ -128,13 +195,14 @@ chrome.runtime.onMessage.addListener(
         console.log("FilePath:", filePath);
 
         const response = await fetch(url, {
-            headers: {
-                Authorization: `token ${token}`,
-              Accept: "application/vnd.github.v3+json",
+          headers: {
+            Authorization: `token ${token}`,
+            Accept: "application/vnd.github.v3+json",
           },
         });
+
         if (response.status === 200) {
-           const data = await response.json();
+          const data = await response.json();
           console.log("File exists. SHA:", data.sha);
           await updateFile(url, code, data.sha, token, sendResponse);
         } else if (response.status === 404) {
@@ -142,94 +210,19 @@ chrome.runtime.onMessage.addListener(
           await createFile(url, code, token, sendResponse);
         } else {
           const errorDetails = await response.text();
-            console.error(
-                `GitHub API error: ${response.status} - ${response.statusText}\nDetails: ${errorDetails}`
-            );
-            sendResponse({
-              success: false,
-              error: `GitHub API error: ${response.status} - ${response.statusText}\nDetails: ${errorDetails}`,
-            });
+          console.error(
+            `GitHub API error: ${response.status} - ${response.statusText}\nDetails: ${errorDetails}`
+          );
+          sendResponse({
+            success: false,
+            error: `GitHub API error: ${response.status} - ${response.statusText}\nDetails: ${errorDetails}`,
+          });
         }
       } catch (error) {
-          console.error("Error processing message:", error);
-            sendResponse({ success: false, error: error.message });
+        console.error("Error processing message:", error);
+        sendResponse({ success: false, error: error.message });
       }
-       return true;
+      return true; // Indicates async response
     }
   }
 );
-
-// Function to update an existing file
-function updateFile(url, code, sha, token, sendResponse) {
-  console.log("Updating file...");
-  fetch(url, {
-    method: "PUT",
-    headers: {
-      Authorization: `token ${token}`,
-      Accept: "application/vnd.github.v3+json",
-    },
-    body: JSON.stringify({
-      message: "Update file via DeepSync Chrome Extension",
-      content: encodeUnicodeToBase64(code),
-      sha: sha,
-    }),
-  })
-    .then((response) => {
-        if (!response.ok) {
-            return response.text().then(text => {
-                throw new Error(`GitHub API error: ${response.status} - ${response.statusText}\nDetails: ${text}`);
-        });
-
-      }
-        return response.json();
-    })
-    .then((data) => {
-          console.log("GitHub API Response (Update):", data);
-        sendResponse({
-            success: true,
-            isNewFile: false,
-            filePath: data.content.path,
-        });
-    })
-    .catch((error) => {
-       console.error("Error updating file:", error);
-      sendResponse({ success: false, error: error.message });
-    });
-}
-
-// Function to create a new file
-function createFile(url, code, token, sendResponse) {
-  console.log("Creating new file...");
-  fetch(url, {
-      method: "PUT",
-      headers: {
-        Authorization: `token ${token}`,
-        Accept: "application/vnd.github.v3+json",
-      },
-        body: JSON.stringify({
-            message: "Create new file via DeepSync Chrome Extension",
-          content: encodeUnicodeToBase64(code),
-        }),
-  })
-      .then((response) => {
-           if (!response.ok) {
-             return response.text().then(text => {
-                throw new Error(`GitHub API error: ${response.status} - ${response.statusText}\nDetails: ${text}`);
-        });
-      }
-        return response.json();
-      })
-      .then((data) => {
-          console.log("GitHub API Response (Create):", data);
-          sendResponse({
-            success: true,
-            isNewFile: true,
-            filePath: data.content.path,
-        });
-      })
-      .catch((error) => {
-          console.error("Error creating file:", error);
-        sendResponse({ success: false, error: error.message });
-      });
-}
-    
