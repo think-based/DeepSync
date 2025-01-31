@@ -1,4 +1,4 @@
 {
-  "include": ["*.js", "*.json" , "*.html" , "*.MD"], 
-  "exclude": [] 
+    "include": ["src/**/*.js", "README.md"], 
+    "exclude": ["node_modules/**", "dist/**"]
 }

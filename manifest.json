@@ -3,22 +3,24 @@
   "name": "DeepSync",
   "version": "1.5",
   "description": "Sync code blocks from chat platforms to GitHub.",
-  "permissions": ["activeTab", "scripting", "storage", "clipboardWrite"],
+  "permissions": ["activeTab", "scripting", "storage", "clipboardWrite", "nativeMessaging"],
   "host_permissions": [
     "https://api.github.com/*",
     "https://github.com/*"
   ],
   "background": {
-    "service_worker": "background.js"
+    "service_worker": "background.js",
+    "type": "module"
   },
   "content_scripts": [
     {
       "matches": [
         "https://chat.openai.com/*",
         "https://chat.deepseek.com/*",
-        "https://aistudio.google.com/*" 
+        "https://aistudio.google.com/*"
       ],
-      "js": ["content.js"]
+      "js": ["content.js","utils.js"],
+      "type": "module"
     }
   ],
   "action": {
