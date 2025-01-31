@@ -102,33 +102,34 @@ function addUpdateGitButton(copyButton, codeBlock) {
   updateGitButton.style.padding = "5px 10px";
   updateGitButton.style.cursor = "pointer";
   updateGitButton.style.display = "inline-block";
-  updateGitButton.addEventListener("click", async () => {
+  updateGitButton.addEventListener("click", () => {
     updateGitButton.disabled = true;
     updateGitButton.textContent = "Updating...";
-    try {
-      if (!chrome.runtime?.id) {
-        throw new Error("Extension context invalidated. Please reload the page.");
+
+    // Fetch settings directly, without async/await, using a callback
+    chrome.storage.local.get(["repo", "token"], (data) => {
+      if (chrome.runtime.lastError) {
+         updateGitButton.disabled = false;
+         updateGitButton.textContent = "Update Git";
+        showToast(`Error: ${chrome.runtime.lastError.message || "Failed to fetch settings."}`, true);
+        return;
       }
-      const { repo, token } = await new Promise((resolve, reject) => {
-        chrome.storage.local.get(["repo", "token"], (data) => {
-          if (chrome.runtime.lastError) {
-            reject(
-              new Error(
-                chrome.runtime.lastError.message || "Failed to fetch settings."
-              )
-            );
-          } else {
-            resolve(data);
-          }
-        });
-      });
+
+      const { repo, token } = data;
 
       if (!repo || !token) {
-        throw new Error("Please configure repository and token in settings!");
+        updateGitButton.disabled = false;
+        updateGitButton.textContent = "Update Git";
+        showToast("Please configure repository and token in settings!", true);
+        return;
       }
+
       let filePath = extractFileName(codeBlock);
       if (!filePath) {
-        throw new Error("File path is required!");
+        updateGitButton.disabled = false;
+        updateGitButton.textContent = "Update Git";
+        showToast("File path is required!", true);
+        return;
       }
       filePath = normalizeFilePath(filePath);
 
@@ -136,38 +137,50 @@ function addUpdateGitButton(copyButton, codeBlock) {
       let codeText = codeElement?.textContent;
 
       if (!codeText || codeText.trim() === "") {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        codeText = codeElement?.textContent;
-      }
+        setTimeout(() => {
+           codeText = codeElement?.textContent;
+          if (!codeText || codeText.trim() === "") {
+               updateGitButton.disabled = false;
+               updateGitButton.textContent = "Update Git";
+            showToast("Failed to read code block content. Please try again.", true);
+            return;
+           }
+           sendUpdateRequest(codeText, filePath, updateGitButton);
+         }, 500);
+          return;
+        }
 
-      if (!codeText || codeText.trim() === "") {
-        throw new Error("Failed to read code block content. Please try again.");
-      }
+        sendUpdateRequest(codeText, filePath, updateGitButton);
 
-      // Use await here to properly wait for the response
-      const response = await chrome.runtime.sendMessage({
-        action: "updateGitFile",
-        code: codeText,
-        filePath: filePath,
-      });
-      if (response && response.success) {
-        updateGitButton.textContent = `${filePath} Updated`;
-        updateGitButton.style.backgroundColor = "#4CAF50";
-        updateGitButton.disabled = true;
-        showToast(`File "${filePath}" updated successfully!`);
-      } else {
-        throw new Error(response?.error || "Failed to update file.");
+
+    });
+      function sendUpdateRequest(codeText, filePath, updateGitButton){
+          chrome.runtime.sendMessage(
+                {
+                    action: "updateGitFile",
+                    code: codeText,
+                    filePath: filePath,
+                },
+                (response) => {
+                    if (chrome.runtime.lastError) {
+                           updateGitButton.disabled = false;
+                           updateGitButton.textContent = "Update Git";
+                      showToast(`Error: ${chrome.runtime.lastError.message || "Failed to send message."}`, true);
+                    return;
+                    }
+                   if (response && response.success) {
+                        updateGitButton.textContent = `${filePath} Updated`;
+                        updateGitButton.style.backgroundColor = "#4CAF50";
+                        updateGitButton.disabled = true;
+                       showToast(`File "${filePath}" updated successfully!`);
+                   } else {
+                         updateGitButton.disabled = false;
+                        updateGitButton.textContent = "Update Git";
+                       showToast(`Error: ${response?.error || "Failed to update file."}`, true);
+                    }
+                }
+           );
       }
-    } catch (error) {
-      console.error("Error updating file:", error);
-      showToast(`Error: ${error.message}`, true);
-      if (error.message.includes("Extension context invalidated")) {
-        showToast("Reloading page...", true);
-        setTimeout(() => location.reload(), 2000);
-      }
-      updateGitButton.disabled = false;
-      updateGitButton.textContent = "Update Git";
-    }
   });
 
   copyButton.parentNode.insertBefore(updateGitButton, copyButton.nextSibling);
