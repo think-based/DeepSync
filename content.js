@@ -137,6 +137,7 @@ function addUpdateGitButton(copyButton, codeBlock) {
       sendUpdateRequest(codeText, filePath, updateGitButton);
 
       function sendUpdateRequest(codeText, filePath, updateGitButton){
+        try {
           chrome.storage.local.get(["repo", "token", "salt"], async (data) => {
             if (chrome.runtime.lastError) {
               updateGitButton.disabled = false;
@@ -213,7 +214,10 @@ function addUpdateGitButton(copyButton, codeBlock) {
                 showToast(`Error during token decryption ${error.message}`, true);
             }
           });
-
+        } catch (error) {
+          showToast(`Error: ${error.message}`, true);
+          window.location.reload();
+        }
       }
 
   });
@@ -257,4 +261,13 @@ function observeDOMChanges() {
   });
 }
 
-observeDOMChanges();
+window.addEventListener('load', () => {
+  // Give extra time for all dynamic content to settle
+  setTimeout(() => {
+    if (document.readyState === 'complete') {
+      requestAnimationFrame(() => {
+        observeDOMChanges();
+      });
+    }
+  }, 3000);
+});

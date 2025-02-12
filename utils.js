@@ -68,3 +68,59 @@ function decodeBase64Unicode(base64) {
       return null;
     }
   }
+
+// Add all shared functions here
+const SharedUtils = {
+  encodeUnicodeToBase64,
+  decodeBase64Unicode,
+  generateKey,
+  decryptToken,
+  showToast: (message, isError = false) => {
+    chrome.runtime.sendMessage({
+      action: 'showToast',
+      message,
+      isError
+    });
+  }
+};
+
+// Message handler for shared functionality
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  switch (request.action) {
+    case 'encodeBase64':
+      sendResponse({ result: SharedUtils.encodeUnicodeToBase64(request.data) });
+      break;
+    case 'decryptToken':
+      SharedUtils.decryptToken(request.token, request.password, request.salt)
+        .then(result => sendResponse({ result }));
+      break;
+  }
+  return true;
+});
+
+// Add storage utilities
+const StorageUtils = {
+  async cacheKey(key, value, expirationMinutes = 30) {
+    const item = {
+      value,
+      timestamp: Date.now(),
+      expirationMinutes
+    };
+    await chrome.storage.local.set({ [key]: item });
+  },
+
+  async getCachedKey(key) {
+    const data = await chrome.storage.local.get(key);
+    if (!data[key]) return null;
+
+    const item = data[key];
+    const expirationTime = item.timestamp + (item.expirationMinutes * 60 * 1000);
+    
+    if (Date.now() > expirationTime) {
+      await chrome.storage.local.remove(key);
+      return null;
+    }
+    
+    return item.value;
+  }
+};

@@ -1,52 +1,42 @@
-    // Function to encode Unicode strings to Base64
-  function encodeUnicodeToBase64(str) {
-    return btoa(
-      encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
-        return String.fromCharCode("0x" + p1);
+    // Function to update an existing file
+    function updateFile(url, code, sha, token, sendResponse) {
+      console.log("Updating existing file...");
+      return fetch(url, {
+        method: "PUT",
+        headers: {
+          Authorization: `token ${token}`,
+          Accept: "application/vnd.github.v3+json",
+        },
+        body: JSON.stringify({
+          message: "Update file via DeepSync Chrome Extension",
+          content: encodeUnicodeToBase64(code),
+          sha: sha,
+        }),
       })
-    );
-  }
-
-// Function to update an existing file
-function updateFile(url, code, sha, token, sendResponse) {
-  console.log("Updating file...");
-  return fetch(url, {
-    method: "PUT",
-    headers: {
-      Authorization: `token ${token}`,
-      Accept: "application/vnd.github.v3+json",
-    },
-    body: JSON.stringify({
-      message: "Update file via DeepSync Chrome Extension",
-      content: encodeUnicodeToBase64(code),
-      sha: sha,
-    }),
-  })
-    .then((response) => {
-      if (!response.ok) {
-        return response.text().then((errorDetails) => {
-          throw new Error(
-            `GitHub API error: ${response.status} - ${response.statusText}\nDetails: ${errorDetails}`
-          );
+        .then((response) => {
+          if (!response.ok) {
+            return response.text().then((errorDetails) => {
+              throw new Error(
+                `GitHub API error: ${response.status} - ${response.statusText}\nDetails: ${errorDetails}`
+              );
+            });
+          }
+          return response.json();
+        })
+        .then((data) => {
+          console.log("GitHub API Response (Update):", data);
+          sendResponse({
+            success: true,
+            isNewFile: false,
+            filePath: data.content.path,
+          });
+          return true;
+        })
+        .catch((error) => {
+          console.error("Error updating file:", error);
+          sendResponse({ success: false, error: error.message });
         });
-      }
-      return response.json();
-    })
-    .then((data) => {
-        console.log("GitHub API Response (Update):", data);
-        sendResponse({
-          success: true,
-          isNewFile: false,
-          filePath: data.content.path,
-        });
-        return true;
-    })
-    .catch((error) => {
-      console.error("Error updating file:", error);
-      sendResponse({ success: false, error: error.message });
-    });
-}
-
+    }
 // Function to create a new file
 function createFile(url, code, token, sendResponse) {
   console.log("Creating new file...");
@@ -152,3 +142,14 @@ chrome.runtime.onMessage.addListener(
   }
 }
 );
+
+// Add this at the top of background.js
+function encodeUnicodeToBase64(str) {
+  return btoa(
+    encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (match, p1) => {
+      return String.fromCharCode("0x" + p1);
+    })
+  );
+}
+
+// The rest of your background.js code remains the same

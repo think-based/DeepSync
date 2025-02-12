@@ -101,42 +101,60 @@ try {
 
 // Save settings
 document.getElementById('settingsForm').addEventListener('submit', async function (e) {
-  e.preventDefault();
+    e.preventDefault();
 
-  const repo = document.getElementById('repo').value;
-  const token = document.getElementById('token').value;
+    const repo = document.getElementById('repo').value;
+    const token = document.getElementById('token').value;
 
-  if (!repo || !token) {
-      showToast("Repository and token are required!", true);
-      return;
-  }
+    if (!repo || !token) {
+        showToast("Repository and token are required!", true);
+        return;
+    }
 
-  // Generate a unique salt for each user
-  const salt = generateSalt();
-  const password = chrome.runtime.id; // Use extension ID as password
+    try {
+        await handleToken(token);
+      
+        // Save the repository
+        chrome.storage.local.set({ repo }, function () {
+           if (chrome.runtime.lastError) {
+                 console.error("Error saving settings:", chrome.runtime.lastError);
+               showToast("Failed to save settings!", true);
+            } else {
+                console.log("Settings saved successfully:", { repo });
+                showToast("Settings saved successfully!");
+                updateCurrentSettingsDisplay(repo, token);
+            }
+        });
+    } catch (error) {
+        console.error("Error saving settings:", error);
+        showToast(`Error: ${error.message}`, true);
+    }
+});
 
-  try {
-      const generatedKey = await generateKey(password, salt);
-      const encryptedToken = await encryptToken(token, generatedKey);
-
-      if (!encryptedToken) {
-          throw new Error("Failed to encrypt token!");
-      }
-      // Save the settings and salt
-      chrome.storage.local.set({ repo, token: encryptedToken, salt }, function () {
-         if (chrome.runtime.lastError) {
-               console.error("Error saving settings:", chrome.runtime.lastError);
-             showToast("Failed to save settings!", true);
-          } else {
-              console.log("Settings saved successfully:", { repo, token: encryptedToken, salt });
-              showToast("Settings saved successfully!");
-              updateCurrentSettingsDisplay(repo, token);
-          }
+// Update token handling with storage
+async function handleToken(token) {
+    setLoading(true);
+    try {
+      const salt = generateSalt();
+      const key = await generateKey(password, salt);
+      const encryptedToken = await encryptToken(token, key);
+    
+      await StorageUtils.cacheKey('github_token', {
+        encrypted: encryptedToken,
+        salt
       });
-  } catch (error) {
-      console.error("Error saving settings:", error);
-      showToast(`Error: ${error.message}`, true);
-  }
+    
+      showToast('Token saved successfully');
+    } catch (error) {
+      showToast('Failed to save token', true);
+    } finally {
+      setLoading(false);
+    }
+}
+
+// Add cleanup on extension disable
+chrome.runtime.onSuspend.addListener(() => {
+    chrome.storage.local.clear();
 });
 
 // Convert wildcard pattern to regex
